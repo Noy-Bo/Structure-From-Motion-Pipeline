@@ -67,6 +67,7 @@ if __name__ == "__main__":
     ## ------------------------------------------------------------------ ##
     """
     mode = "simulate poses"
+    mode = "rotation demo"
     logger = simulator.run_simulator(camera_poses=input_camera_poses, camera_object_transformations=camera_object_transformations, mode=mode, hold_poses=False)
 
     if logger is not None:
