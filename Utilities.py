@@ -2,6 +2,9 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import Parameters
+import cv2
+
+
 
 # euler angles to rotation matrix
 def construct_rotation_from_euler(euler_angles):
@@ -301,3 +304,124 @@ def zero_small_values(a):
     close_to_zero_boolean = np.isclose(a,0)
     a[close_to_zero_boolean] = 0
     return a
+def plot_cam(ax, rvec, tvec, color):
+    # Convert the rotation vector to a rotation matrix
+    R, _ = cv2.Rodrigues(rvec)
+
+    # Create a 4x4 transformation matrix
+    T = np.eye(4)
+    T[:3, :3] = R
+    T[:3, 3] = tvec.T
+
+    # Create the basis vectors for the camera pose
+    x = T @ np.array([1, 0, 0, 1])
+    y = T @ np.array([0, 1, 0, 1])
+    z = T @ np.array([0, 0, 1, 1])
+    o = T @ np.array([0, 0, 0, 1])
+
+    # Normalize the vectors
+    x = x / np.linalg.norm(x - o)
+    y = y / np.linalg.norm(y - o)
+    z = z / np.linalg.norm(z - o)
+
+    # Plot the basis vectors
+    ax.quiver(o[0], o[1], o[2], x[0] - o[0], x[1] - o[1], x[2] - o[2], color=color)
+    ax.quiver(o[0], o[1], o[2], y[0] - o[0], y[1] - o[1], y[2] - o[2], color=color)
+    ax.quiver(o[0], o[1], o[2], z[0] - o[0], z[1] - o[1], z[2] - o[2], color=color)
+
+    ax.set_xlim([-2, 2])
+    ax.set_ylim([-2, 2])
+    ax.set_zlim([-2, 2])
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+def cam_visualization(cam_params_solution, cam_params_init, cam_params_GT):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    for cam_idx in range(cam_params_solution.shape[0]):
+        rvec_solution = cam_params_solution[cam_idx, :3]
+        tvec_solution = cam_params_solution[cam_idx, 3:6]
+        plot_cam(ax,rvec_solution, tvec_solution, 'b')
+
+        rvec_init = cam_params_init[cam_idx, :3]
+        tvec_init = cam_params_init[cam_idx, 3:6]
+        plot_cam(ax, rvec_init, tvec_init, 'r')
+
+        rvec_GT = cam_params_GT[cam_idx, :3]
+        tvec_GT = cam_params_GT[cam_idx, 3:6]
+        plot_cam(ax, rvec_GT, tvec_GT, 'g')
+
+    plt.show()
+
+def arc_visualization(points3d, model_lines):
+    # vizualization of triangulation output
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    for i in range(0, points3d.shape[0]):
+        xs = points3d[i][0]
+        ys = points3d[i][1]
+        zs = points3d[i][2]
+        ax.scatter(xs, ys, zs)
+
+    for line in model_lines:
+        point1 = (points3d[line[0]][0], points3d[line[0]][1], points3d[line[0]][2])
+        point2 = (points3d[line[1]][0], points3d[line[1]][1], points3d[line[1]][2])
+
+        x = np.array([point1[0], point2[0]])
+        y = np.array([point1[1], point2[1]])
+        z = np.array([point1[2], point2[2]])
+
+        # Plot the line
+        ax.plot(x, y, z)
+
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+
+def cam_and_pts_visualization(points_3d, points_3d_solution, camera_params, camera_params_solution, camera_params_GT, points_3d_GT):
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    # plot pts init
+    for i in range(0, points_3d.shape[0]):
+        xs = points_3d[i][0]
+        ys = points_3d[i][1]
+        zs = points_3d[i][2]
+        ax.scatter(xs, ys, zs, color='red')
+
+    # plot pts solution
+    for i in range(0, points_3d_solution.shape[0]):
+        xs = points_3d_solution[i][0]
+        ys = points_3d_solution[i][1]
+        zs = points_3d_solution[i][2]
+        ax.scatter(xs, ys, zs, color= 'blue')
+
+    # plot pts GT
+    for i in range(0, points_3d_GT.shape[0]):
+        xs = points_3d_GT[i][0]
+        ys = points_3d_GT[i][1]
+        zs = points_3d_GT[i][2]
+        ax.scatter(xs, ys, zs, color='green')
+
+    #plot cameras
+    for cam_idx in range(camera_params_solution.shape[0]):
+        #solution
+        rvec_solution = camera_params_solution[cam_idx, :3]
+        tvec_solution = camera_params_solution[cam_idx, 3:6]
+        plot_cam(ax,rvec_solution, tvec_solution, 'b')
+
+        #init
+        rvec_init = camera_params[cam_idx, :3]
+        tvec_init = camera_params[cam_idx, 3:6]
+        plot_cam(ax, rvec_init, tvec_init, 'r')
+
+        #GT:
+        rvec_init = camera_params_GT[cam_idx, :3]
+        tvec_init = camera_params_GT[cam_idx, 3:6]
+        plot_cam(ax, rvec_init, tvec_init, 'g')
+
+    plt.axis('equal')
+    plt.show()

@@ -32,5 +32,5 @@ projection_matrix = np.matrix([[FOCAL_LENGTH,0,WIDTH/2],
 # of the camera and object adding a stepback
 # to camera will allow the camera# to
 # observe the object.
-DEFAULT_SCALE = -20
+DEFAULT_SCALE = 0# was -20, DISABLED due to problems with triangulation
 ## ---------------------------------------- ##

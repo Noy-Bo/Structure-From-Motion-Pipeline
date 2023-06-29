@@ -21,8 +21,8 @@ t1 = [0, 0, 0]
 EA1 = [0, 0, 0]
 input_camera_poses.append((t1, EA1))
 # pose 2
-t2 = [1, 0, 0]
-EA2 = [-0.2, 0.5, 0]
+t2 = [0, 1, 0]
+EA2 = [-0.4, 0, 0]
 input_camera_poses.append((t2, EA2))
 # # pose 3
 # t3 = [0, 0, -1]
@@ -67,7 +67,6 @@ if __name__ == "__main__":
     ## ------------------------------------------------------------------ ##
     """
     mode = "simulate poses"
-    mode = "rotation demo"
     logger = simulator.run_simulator(camera_poses=input_camera_poses, camera_object_transformations=camera_object_transformations, mode=mode, hold_poses=False)
 
     if logger is not None:
@@ -78,6 +77,8 @@ if __name__ == "__main__":
         t0 = 0
         tend = len(input_camera_poses)-1
         GT_poses, estimations = estimator.estimate_relative_pose(logger=logger,t0=t0, t1=tend)
+
+        GT_points, estimations = estimator.estimate_3D_points(logger=logger, t0=t0, t1=tend)
 
         # plotting statistics.
         Utilities.plot_statistics(estimations=estimations, GT=GT_poses)
