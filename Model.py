@@ -74,6 +74,23 @@ class Model:
             y_ = (p.flat[1])
             z_ = (p.flat[2])
             self._points.append(np.matrix([x_, y_, z_]))
+
+        #add random points
+
+        # Set the seed for reproducibility (optional)
+        np.random.seed(0)
+
+        # Sample 100 points for each coordinate
+        x = np.random.uniform(-10, 10, 100)
+        y = np.random.uniform(-10, 10, 100)
+        z = np.random.uniform(-30, -10, 100)
+
+        # Uncomment this code if you want to add some random landmarks into the scene!
+        # for i in range(100):
+        #     self._points.append(np.matrix([x[i], y[i], z[i]]))
+
+
+        # Print the first 5 points
     def add_mid_points(self):
 
         for line in self._model_lines:

@@ -7,7 +7,7 @@ import Model
 import Utilities
 import time
 from scipy.spatial.transform import Rotation as Rotation
-from BA import prepare_data_BA, run_BA
+from BA import run_BA
 from Parameters import TOLERANCE
 from Utilities import arc_visualization, cam_visualization, cam_and_pts_visualization
 
@@ -16,7 +16,7 @@ class Estimator:
         self._logger = logger
 
     # pose estimation
-    def estimate_relative_pose(self, logger, t0, t1):
+    def estimate_relative_pose_and_landmarks(self, logger, t0, t1):
 
         # define data structure for each solver & GT
         estimations = []
@@ -60,14 +60,6 @@ class Estimator:
             err_5p = Utilities.calc_reprojection_error(point5_solutions['name'], pts_i1=logger[prev]['projections'], pts_i2=logger[curr]['projections'], R_rel=R_5p, t_rel=t_5p, K=logger[prev]['viewing_camera']._K , scale=logger[prev]['points_scale'])
             point5_solutions[i] = ((R_5p,t_5p, err_5p, time_5p))
 
-            # # estimating with 7 point algorithm (opencv)
-            # R1_7p, R2_7p, t_7p, time_7p = self.estimate_R_t_opencv(t0=prev, t1=curr, method=cv2.FM_7POINT)
-            # R1_7p = Utilities.zero_small_values(R1_7p)
-            # R2_7p = Utilities.zero_small_values(R2_7p)
-            # R_7p, t_7p = Utilities.choose_closest_solution(est=[R1_7p, R2_7p, t_7p], GT=[GT_R_rel, GT_t_rel])
-            # err_7p = Utilities.calc_reprojection_error(point5_solutions['name'], pts_i1=logger[prev]['projections'], pts_i2=logger[curr]['projections'], R_rel=R_7p, t_rel=t_7p, K=logger[prev]['viewing_camera']._K , scale=logger[prev]['points_scale'])
-            # point7_solutions[i] = ((R_7p,t_7p, err_7p, time_7p))
-
             # eestimating with 8 point algorithm (opencv)
             R1_8p, R2_8p, t_8p, time_8p = self.estimate_R_t_opencv(t0=prev, t1=curr, method=cv2.FM_8POINT)
             R1_8p = Utilities.zero_small_values(R1_8p)
@@ -98,7 +90,7 @@ class Estimator:
             triangulation_DLT_solutions[i] = points3D_DLT
 
             # Bundle Adjustment
-            Result = self.solveBA(t0=prev, t1=curr, estimationPts=triangulation_OpenCV_solutions, estimationCams=point8_solutions, addNoise=True)
+            camera_params_estimation, points_3d_estimation = self.solveBA(t0=prev, t1=curr, estimationPts=triangulation_OpenCV_solutions, estimationCams=point8_solutions, addNoise=True)
 
         return GT_poses, estimations
     def estimate_R_t_naive(self, t0, t1):
@@ -251,33 +243,33 @@ class Estimator:
         return R1.transpose(),R2.transpose(),-t,(toc-tic)
 
     # 3D points estimation
-    def estimate_3D_points(self, logger, t0, t1):
-
-        # define data structure for each solver & GT
-        estimations = []
-        point5_solutions = {}
-        #point7_solutions = {}
-        point8_solutions = {}
-        naive_solutions = {}
-        point5_solutions['name'] = '5 point'
-        #point7_solutions['name'] = '7 point'
-        point8_solutions['name'] = '8 point'
-        naive_solutions['name'] = 'naive least squares'
-        estimations.append(point5_solutions)
-        #estimations.append(point7_solutions)
-        estimations.append(point8_solutions)
-        estimations.append(naive_solutions)
-
-        GT_poses = {}
-        GT_poses['name'] = 'GT'
-
-        for i in range(t0, t1):
-            prev = 0 # estimate R,t with relation to first pose which should be 0 translation and 0 rotation.
-            curr = i+1
-
-            # Triangulation using 5point algorithm results
-            points3D_opencv = self.triangulation_opencv(t0, t1, R_5p, t_5p)
-            points3D_DLT =  self.dlt_triangulation(t0, t1, R_5p, t_5p)
+    # def estimate_3D_points(self, logger, t0, t1):
+    #
+    #     # define data structure for each solver & GT
+    #     estimations = []
+    #     point5_solutions = {}
+    #     #point7_solutions = {}
+    #     point8_solutions = {}
+    #     naive_solutions = {}
+    #     point5_solutions['name'] = '5 point'
+    #     #point7_solutions['name'] = '7 point'
+    #     point8_solutions['name'] = '8 point'
+    #     naive_solutions['name'] = 'naive least squares'
+    #     estimations.append(point5_solutions)
+    #     #estimations.append(point7_solutions)
+    #     estimations.append(point8_solutions)
+    #     estimations.append(naive_solutions)
+    #
+    #     GT_poses = {}
+    #     GT_poses['name'] = 'GT'
+    #
+    #     for i in range(t0, t1):
+    #         prev = 0 # estimate R,t with relation to first pose which should be 0 translation and 0 rotation.
+    #         curr = i+1
+    #
+    #         # Triangulation using 5point algorithm results
+    #         points3D_opencv = self.triangulation_opencv(t0, t1, R_5p, t_5p)
+    #         points3D_DLT =  self.dlt_triangulation(t0, t1, R_5p, t_5p)
 
         return GT_poses, estimations
     def dlt_triangulation(self, t0, t1, R_r, t_r):
@@ -332,30 +324,17 @@ class Estimator:
             points3D.append(X3D.tolist())
 
         # visualization
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-
-        np_points3D = np.asarray(points3D)
-        xs = np_points3D[:,0]
-        ys = np_points3D[:,1]
-        zs = np_points3D[:,2]
-        ax.scatter(xs, ys, zs)
-
-        for line in Model.model_lines:
-            point1 = np_points3D[line[0],:]
-            point2 = np_points3D[line[1],:]
-
-            x = np.array([point1[0], point2[0]])
-            y = np.array([point1[1], point2[1]])
-            z = np.array([point1[2], point2[2]])
-
-            # Plot the line
-            ax.plot(x, y, z)
-
-
-        ax.set_xlabel('X Label')
-        ax.set_ylabel('Y Label')
-        ax.set_zlabel('Z Label')
+        # vizualization of triangulation output
+        GT_points3D = []
+        for i in range(0, len(Model.model_points)):
+            p = []
+            p.append(Model.model_points[i].flatten()[0][0, 0])
+            p.append(Model.model_points[i].flatten()[0][0, 1])
+            p.append(Model.model_points[i].flatten()[0][0, 2])
+            GT_points3D.append(p)
+        GT_points3D = np.asarray(GT_points3D)
+        arc_visualization(np.asarray(points3D), Model.model_lines, "DLT Triangulated Model")
+        arc_visualization(GT_points3D, Model.model_lines, "GT Model")
 
         return points3D
     def triangulation_opencv(self, t0, t1, R_r, t_r):
@@ -376,74 +355,51 @@ class Estimator:
         points3d = (points4d[:3, :] / points4d[3, :]).T
 
         # vizualization of triangulation output
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-
-        for i in range(0,points3d.shape[0]):
-            xs = points3d[i][0]
-            ys = points3d[i][1]
-            zs = points3d[i][2]
-            ax.scatter(xs, ys, zs)
-
-        for line in Model.model_lines:
-            point1  = (points3d[line[0]][0], points3d[line[0]][1], points3d[line[0]][2])
-            point2  = (points3d[line[1]][0], points3d[line[1]][1], points3d[line[1]][2])
-
-            x = np.array([point1[0], point2[0]])
-            y = np.array([point1[1], point2[1]])
-            z = np.array([point1[2], point2[2]])
-
-            # Plot the line
-            ax.plot(x, y, z)
-
-
-        ax.set_xlabel('X Label')
-        ax.set_ylabel('Y Label')
-        ax.set_zlabel('Z Label')
-
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-
-        for i in range(0,len(Model.model_points)):
-            xs = Model.model_points[i].flatten()[0][0, 0]
-            ys = Model.model_points[i].flatten()[0][0, 1]
-            zs = Model.model_points[i].flatten()[0][0, 2]
-            ax.scatter(xs, ys, zs)
-
-        for line in Model.model_lines:
-            point1  = (Model.model_points[line[0]].flatten()[0][0, 0], Model.model_points[line[0]].flatten()[0][0, 1], Model.model_points[line[0]].flatten()[0][0, 2])
-            point2  = (Model.model_points[line[1]].flatten()[0][0, 0], Model.model_points[line[1]].flatten()[0][0, 1], Model.model_points[line[1]].flatten()[0][0, 2])
-
-            x = np.array([point1[0], point2[0]])
-            y = np.array([point1[1], point2[1]])
-            z = np.array([point1[2], point2[2]])
-
-            # Plot the line
-            ax.plot(x, y, z)
-
-
-        ax.set_xlabel('X Label')
-        ax.set_ylabel('Y Label')
-        ax.set_zlabel('Z Label')
+        GT_points3D = []
+        for i in range(0, len(Model.model_points)):
+            p = []
+            p.append(Model.model_points[i].flatten()[0][0, 0])
+            p.append(Model.model_points[i].flatten()[0][0, 1])
+            p.append(Model.model_points[i].flatten()[0][0, 2])
+            GT_points3D.append(p)
+        GT_points3D = np.asarray(GT_points3D)
+        arc_visualization(points3d, Model.model_lines, "OpenCV Triangulated Model")
+        arc_visualization(GT_points3D, Model.model_lines, "GT Model")
 
         return points3d
 
-    def solveBA(self, t0, t1, estimationPts, estimationCams, addNoise=False, pts_mean=0, pts_var=0, cams_mean=0, cams_var=0.5):
+    def solveBA(self, t0, t1, estimationPts, estimationCams, addNoise=False, pts_mean=0, pts_var=0.15, cams_t_mean=0, cams_t_var=0.01,  cams_r_mean=0, cams_r_var=0.01):
 
          camera_params, points_3D, camera_ind, point_ind, points_2D, camera_params_GT, points_3D_GT  = self.my_prepare_data_BA(t0, t1, estimationPts, estimationCams)
 
          if addNoise is True:
-            camera_params, points_3D = self.add_gaussian_noise_to_params(camera_params, points_3D, pts_mean, pts_var, cams_mean, cams_var)
+            camera_params, points_3D = self.add_gaussian_noise_to_params(camera_params, points_3D, pts_mean, pts_var, cams_t_mean, cams_t_var,  cams_r_mean, cams_r_var)
 
          camera_params_solution, points_3d_solution = run_BA(camera_params, points_3D, camera_ind, point_ind, points_2D)
 
+         # mse_cams_input_GT = np.mean((camera_params_GT - camera_params[:,:6])**2)
+         # mse_pts_input_GT = np.mean((points_3D_GT - points_3D)**2)
+         #
+         # mse_cams_opt_GT = np.mean((camera_params_GT - camera_params_solution[:,:6])**2)
+         # mse_pts_opt_GT = np.mean((points_3D_GT - points_3d_solution)**2)
+         #
+         # print("MSE input vs GT:")
+         # print("cams: {}".format(str(mse_cams_input_GT)))
+         # print("pts: {}".format(str(mse_pts_input_GT)))
+         #
+         # print("MSE optimized vs GT:")
+         # print("cams: {}".format(str(mse_cams_opt_GT)))
+         # print("pts: {}".format(str(mse_pts_opt_GT)))
+
          #vizualization
-         arc_visualization(points_3D, Model.model_lines)
-         arc_visualization(points_3d_solution, Model.model_lines)
+         arc_visualization(points_3D, Model.model_lines, "Input Model")
+         arc_visualization(points_3d_solution, Model.model_lines, "Optimized Model")
 
          cam_visualization(camera_params_solution, camera_params, camera_params_GT)
 
          cam_and_pts_visualization(points_3D, points_3d_solution, camera_params, camera_params_solution, camera_params_GT, points_3D_GT)
+
+         return camera_params_solution, points_3d_solution
 
     def my_prepare_data_BA(self, t0, t1, estimationPts, estimationCams):
         ############################################################
@@ -473,9 +429,9 @@ class Estimator:
         cam_param.append(t[0,1])
         cam_param.append(t[0,2])
 
-        cam_param.append((K[0,0] + K[1,1]) / 2)
-        cam_param.append(0) # assuming 0 distortion
-        cam_param.append(0) # assuming 0 distortion
+        # cam_param.append((K[0,0] + K[1,1]) / 2)
+        # cam_param.append(0) # assuming 0 distortion
+        # cam_param.append(0) # assuming 0 distortion
 
         camera_params.append(cam_param)
         # adding other cams from estimations
@@ -496,9 +452,9 @@ class Estimator:
             cam_param.append(t[1].item())
             cam_param.append(t[2].item())
 
-            cam_param.append((K[0, 0] + K[1, 1]) / 2)
-            cam_param.append(0)  # assuming 0 distortion
-            cam_param.append(0)  # assuming 0 distortion
+            # cam_param.append((K[0, 0] + K[1, 1]) / 2)
+            # cam_param.append(0)  # assuming 0 distortion
+            # cam_param.append(0)  # assuming 0 distortion
 
             camera_params.append(cam_param)
 
@@ -555,16 +511,20 @@ class Estimator:
             GT_camera_params.append(copy.deepcopy(cam))
         return camera_params_np, points_3D_np, camera_ind_np, point_ind_np, points_2D_np, np.asarray(GT_camera_params), GT_points_3D.squeeze()
 
-    def add_gaussian_noise_to_params(self, camera_params, points_3D, pts_mean, pts_var, cams_mean, cams_var):
+    def add_gaussian_noise_to_params(self, camera_params, points_3D, pts_mean, pts_var, cams_t_mean, cams_t_var,  cams_r_mean, cams_r_var):
         # pts
         samples_pts = np.random.normal(loc=pts_mean, scale=pts_var, size=points_3D.size)
         points_3D += samples_pts.reshape(points_3D.shape)
 
-        # cams
-        samples_cams = np.random.normal(loc=cams_mean, scale=cams_var, size=camera_params.size)
-        camera_params += samples_cams.reshape(camera_params.shape)
+        # cam translation
+        samples_cams = np.random.normal(loc=cams_t_mean, scale=cams_t_var, size=(camera_params.shape[0]*3))
+        camera_params[:,3:6] += samples_cams.reshape(camera_params.shape[0],3)
 
-        # camera_params[:,3:6] += np.random.normal(loc=pts_mean, scale=0.2, size=6).reshape((2,3))
+        # cam rotation
+        samples_cams = np.random.normal(loc=cams_r_mean, scale=cams_r_var, size=(camera_params.shape[0]*3))
+        camera_params[:,:3] += samples_cams.reshape(camera_params.shape[0],3)
+
+        #camera_params[:,0:3] += np.random.normal(loc=pts_mean, scale=0.05, size=6).reshape((2,3))
         return camera_params, points_3D
 
 

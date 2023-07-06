@@ -344,18 +344,25 @@ def cam_visualization(cam_params_solution, cam_params_init, cam_params_GT):
         rvec_solution = cam_params_solution[cam_idx, :3]
         tvec_solution = cam_params_solution[cam_idx, 3:6]
         plot_cam(ax,rvec_solution, tvec_solution, 'b')
+        ax.scatter(cam_params_solution[cam_idx, 3], cam_params_solution[cam_idx, 4], cam_params_solution[cam_idx, 5], color='b', label="Optimized" if cam_idx== 0 else "")
 
         rvec_init = cam_params_init[cam_idx, :3]
         tvec_init = cam_params_init[cam_idx, 3:6]
         plot_cam(ax, rvec_init, tvec_init, 'r')
+        ax.scatter(cam_params_init[cam_idx, 3], cam_params_init[cam_idx, 4], cam_params_init[cam_idx, 5],
+                   color='r', label="Input" if cam_idx == 0 else "")
 
         rvec_GT = cam_params_GT[cam_idx, :3]
         tvec_GT = cam_params_GT[cam_idx, 3:6]
         plot_cam(ax, rvec_GT, tvec_GT, 'g')
+        ax.scatter(cam_params_GT[cam_idx, 3], cam_params_GT[cam_idx, 4], cam_params_GT[cam_idx, 5],
+                   color='g', label="Groud Truth" if cam_idx == 0 else "")
 
+    ax.set_title("Camera Poses:")
+    plt.legend()
     plt.show()
 
-def arc_visualization(points3d, model_lines):
+def arc_visualization(points3d, model_lines, title):
     # vizualization of triangulation output
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -377,10 +384,11 @@ def arc_visualization(points3d, model_lines):
         # Plot the line
         ax.plot(x, y, z)
 
-    ax.set_xlabel('X Label')
-    ax.set_ylabel('Y Label')
-    ax.set_zlabel('Z Label')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
 
+    ax.set_title(title)
 def cam_and_pts_visualization(points_3d, points_3d_solution, camera_params, camera_params_solution, camera_params_GT, points_3d_GT):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -390,21 +398,21 @@ def cam_and_pts_visualization(points_3d, points_3d_solution, camera_params, came
         xs = points_3d[i][0]
         ys = points_3d[i][1]
         zs = points_3d[i][2]
-        ax.scatter(xs, ys, zs, color='red')
+        ax.scatter(xs, ys, zs, color='red', label="Input" if i == 0 else "")
 
     # plot pts solution
     for i in range(0, points_3d_solution.shape[0]):
         xs = points_3d_solution[i][0]
         ys = points_3d_solution[i][1]
         zs = points_3d_solution[i][2]
-        ax.scatter(xs, ys, zs, color= 'blue')
+        ax.scatter(xs, ys, zs, color= 'blue', label="Optimized" if i == 0 else "")
 
     # plot pts GT
     for i in range(0, points_3d_GT.shape[0]):
         xs = points_3d_GT[i][0]
         ys = points_3d_GT[i][1]
         zs = points_3d_GT[i][2]
-        ax.scatter(xs, ys, zs, color='green')
+        ax.scatter(xs, ys, zs, color='green', label="Ground Truth" if i == 0 else "")
 
     #plot cameras
     for cam_idx in range(camera_params_solution.shape[0]):
@@ -423,5 +431,7 @@ def cam_and_pts_visualization(points_3d, points_3d_solution, camera_params, came
         tvec_init = camera_params_GT[cam_idx, 3:6]
         plot_cam(ax, rvec_init, tvec_init, 'g')
 
+    plt.legend()
     plt.axis('equal')
+    ax.set_title("Camera poses & 3D Points: ")
     plt.show()

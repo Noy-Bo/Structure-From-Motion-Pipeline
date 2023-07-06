@@ -199,4 +199,5 @@ class Simulator:
         if mode == "simulate poses":
             self.simulate_poses(camera_poses, hold_poses)
 
+        pygame.quit()
         return self._logger
